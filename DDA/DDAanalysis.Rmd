@@ -1,0 +1,385 @@
+---
+title: "DDAanalysis"
+author: "Riley Sierhuis"
+date: "07/07/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(ggforce)
+library(ggpubr)
+library(ggforce)
+library(gridExtra)
+library(cowplot)
+library(wesanderson)
+library(grid)
+library(gtable)
+library(viridis)
+library(RColorBrewer)
+library(GGally)
+```
+
+
+```{r}
+#Loading in the data
+MandQ_df_MODIFIED <- read.csv("MandQ_df_MODIFIED.csv")
+```
+
+```{r}
+#Subsetting the 20 data, finding average values for each strain/replicate/drug/Person grouping
+DDA_data20 <- MandQ_df_MODIFIED %>% 
+  mutate_each(funs(factor),time) %>% 
+  filter(Person=="M"|strain=="y003"|strain=="y106"|strain=="y109") %>% 
+  filter(Drug==0.5|is.na(Drug)) %>% 
+  group_by(strain,replicate,time,Person) %>% 
+  summarise(avgRAD20 = mean(RAD20),avgFoG20 = mean(FoG20))
+```
+
+```{r}
+#Generating 20 plot
+
+RAD20 <- ggplot(data=DDA_data20,mapping=aes(x = strain,y=avgRAD20,col=time))+
+  geom_sina(alpha=0.4,size=2)+
+  xlab("Strain")+
+  ylab("RAD20")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  ylim(23,0)+
+   scale_color_manual(values = c("grey","purple"),name="",labels=c("Ancestral","Evolved"))+
+  annotate("text",x=c(1,4,5,6),y=c(9.5,8.5,11,9.5),label = "*")+
+  annotate("segment",x=c(0.75,3.75,4.75,5.75),xend = c(1.25,4.25,5.25,6.25),y = c(10,9,11.5,10), yend =c(10,9,11.5,10))
+
+FoG20 <- ggplot(data=DDA_data20,mapping=aes(x=strain,y=avgFoG20,col=time))+
+  geom_sina(alpha=0.4,size=2)+
+  xlab("Strain")+
+  ylab("FoG20")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  scale_color_manual(values = c("grey","purple"),name="",labels=c("Ancestral","Evolved"))+
+  ylim(0,1)+
+  annotate("text",x=c(1,3,4,5,6,7),y=c(0.67,0.62,0.7,0.64,0.71,0.51),label = "*")+
+  annotate("segment",x=c(0.75,2.75,3.75,4.75,5.75,6.75),xend = c(1.25,3.25,4.25,5.25,6.25,7.25),y = c(0.66,0.61,0.69,0.63,0.7,0.5), yend =c(0.66,0.61,0.69,0.63,0.7,0.5))
+
+DDA20 <- plot_grid(RAD20,FoG20,nrow = 2,align = "hv")
+DDA20
+ggsave("DDA_20.pdf",DDA20)
+```
+
+```{r}
+#p-values for RAD20
+
+#Creating dataframe used for t.test
+
+DDAtest <- MandQ_df_MODIFIED %>% 
+  filter(Person=="M"|strain=="y003"|strain=="y106"|strain=="y109") %>% 
+  filter(Drug==0.5|is.na(Drug)) %>% 
+  group_by(strain,replicate,time,Person) %>% 
+  summarise(avgRAD20 = mean(RAD20),avgFoG20 = mean(FoG20))
+
+#Creating dataframe to calculate the difference between means
+
+DDAmeans <- MandQ_df_MODIFIED %>% 
+  filter(Person=="M"|strain=="y003"|strain=="y106"|strain=="y109") %>% 
+  filter(Drug==0.5|is.na(Drug)) %>% 
+  group_by(strain,time) %>% 
+  summarise(avgRAD20 = mean(RAD20,na.rm = T),avgFoG20 = mean(FoG20, na.rm = T))
+
+#Creating empty data frame to store results of for-loop
+
+   RAD20tresults <- data.frame(nrow = 8,ncol=4)
+ 
+#So for this loop, for each strain it is subsetting DDAtest to create subevolved (entries with that strain that are evolved) and subancestral (entries with that strain that are ancestral). It then does a t.test using those two dataframes. Column 2 is the difference between mean evolved - ancestral for each strain, using the DDAmeans datarame to do so. The if-else loop makes p values less than 0.0001 show up as "<0.0001"  
+   
+  j <- 0
+
+for(i in unique(DDAtest$strain)){
+  subevolved <- subset(DDAtest,strain==i & time==5)
+  subancestral <- subset(DDAtest,strain==i & time==0)
+  t <- t.test(subevolved$avgRAD20,subancestral$avgRAD20)
+  j <- j+1
+  a <- which(grepl(i,DDAmeans$strain)&grepl(0,DDAmeans$time))
+  b <- which(grepl(i,DDAmeans$strain)&grepl(5,DDAmeans$time))
+  RAD20tresults[j,1] <- i
+  RAD20tresults[j,2] <- round(DDAmeans[b,3]-DDAmeans[a,3],2)
+  RAD20tresults[j,3] <- round(t$statistic,2)
+  RAD20tresults[j,4] <- round(t$parameter,2)
+   if(t$p.value >= 0.0001){
+  RAD20tresults[j,5] <- round(t$p.value,4)
+  }
+  else{RAD20tresults[j,5] <- "< 0.0001"}
+}
+
+#Making nice column names
+      
+  colnames(RAD20tresults) <- paste(c("Strain","Evol - Anc","t-statistic","Degrees of freedom","p-value"))
+  
+#Saving as csv
+  
+  write.csv(RAD20tresults,file = "RAD20statistics.csv")
+  
+#Saving as pdf table  
+  
+RADtable <- tableGrob(format(RAD20tresults,digits=3),rows = NULL, theme = ttheme_minimal())
+
+ggsave("RAD20table.pdf",RADtable)
+```
+
+```{r}
+#p-values for FoG20, some process as above
+
+ FoG20tresults <- data.frame(nrow = 8,ncol=5)
+ 
+  k <- 0
+  
+  for(i in unique(DDAtest$strain)){
+  subevolved <- subset(DDAtest,strain==i & time==5)
+  subancestral <- subset(DDAtest,strain==i & time==0)
+  tFoG <- t.test(subevolved$avgFoG20,subancestral$avgFoG20)
+  x <- which(grepl(i,DDAmeans$strain)&grepl(0,DDAmeans$time))
+  y <- which(grepl(i,DDAmeans$strain)&grepl(5,DDAmeans$time))
+  k <- k+1
+  FoG20tresults[k,1] <- i
+  FoG20tresults[k,2] <- round(DDAmeans[y,4]-DDAmeans[x,4],2)
+  FoG20tresults[k,3] <- round(tFoG$statistic,2)
+  FoG20tresults[k,4] <- round(tFoG$parameter,2)
+  if(tFoG$p.value >= 0.0001){
+  FoG20tresults[k,5] <- round(tFoG$p.value,4)
+  }
+  else{FoG20tresults[k,5] <- "< 0.0001"}
+}
+
+  
+  colnames(FoG20tresults) <- paste(c("Strain","Evol - Anc","t-statistic","Degrees of freedom","p-value"))
+  
+  write.csv(FoG20tresults,file = "FoG20statistics.csv")
+  
+FoGtable <- tableGrob(format(FoG20tresults,digits=3),rows = NULL, theme = ttheme_minimal())
+
+
+ggsave("FoG20table.pdf",FoGtable)
+  
+ 
+ 
+```
+
+```{r}
+#Wilcox (non-parametric test), not sure if this is the test we wanted to use or not, anyways this code generated some results
+
+WFoG20tresults <- data.frame(nrow = 8,ncol=4)
+ 
+  l <- 0
+  
+  for(i in unique(DDAtest$strain)){
+  subevolved <- subset(DDAtest,strain==i & time==5)
+  subancestral <- subset(DDAtest,strain==i & time==0)
+  WFoG <- wilcox.test(subevolved$avgFoG20,subancestral$avgFoG20)
+  x <- which(grepl(i,DDAmeans$strain)&grepl(0,DDAmeans$time))
+  y <- which(grepl(i,DDAmeans$strain)&grepl(5,DDAmeans$time))
+  l <- l+1
+  WFoG20tresults[l,1] <- i
+  WFoG20tresults[l,2] <- round(DDAmeans[y,4]-DDAmeans[x,4],2)
+  WFoG20tresults[l,3] <- round(WFoG$statistic,2)
+ 
+  if(WFoG$p.value >= 0.0001){
+  WFoG20tresults[l,4] <- round(WFoG$p.value,4)
+  }
+  else{WFoG20tresults[l,4] <- "< 0.0001"}
+}
+```
+
+
+```{r}
+#Subsetting the 50 data
+DDA_data50 <- MandQ_df_MODIFIED %>% 
+  mutate_each(funs(factor),time) %>% 
+  filter(Person=="M"|strain=="y003"|strain=="y106"|strain=="y109") %>% 
+  filter(Drug==0.5|is.na(Drug)) %>% 
+  group_by(strain,replicate,time,Person) %>% 
+  summarise(avgRAD50 = mean(RAD50),avgFoG50 = mean(FoG50))
+```
+
+
+```{r}
+#Generating 50 sina plots
+
+RAD50 <- ggplot(data=DDA_data50,mapping=aes(x=strain,y=avgRAD50,col=time))+
+  geom_sina(alpha=0.45,size=2)+
+  xlab("Strain")+
+  ylab("RAD50")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  scale_y_reverse()+
+   scale_color_discrete(name="",labels=c("Ancestral","Evolved"))
+
+FoG50 <- ggplot(data=DDA_data50,mapping=aes(x=strain,y=avgFoG50,col=time))+
+  geom_sina(alpha=0.45,size=2)+
+  xlab("Strain")+
+  ylab("FoG50")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  scale_color_discrete(name="",labels=c("Ancestral","Evolved"))
+
+DDA50 <- grid.arrange(RAD50,FoG50)
+ggsave("DDA_50.pdf",DDA50)
+```
+
+```{r}
+#Subsetting the 80 data
+
+DDA_data80 <- MandQ_df_MODIFIED %>% 
+  mutate_each(funs(factor),time) %>% 
+  filter(Person=="M"|strain=="y003"|strain=="y106"|strain=="y109") %>% 
+  filter(Drug==0.5|is.na(Drug)) %>% 
+  group_by(strain,replicate,time,Person) %>% 
+  summarise(avgRAD80 = mean(RAD80),avgFoG80 = mean(FoG80))
+
+```
+
+```{r}
+#Generating 80 sina plots
+
+RAD80 <- ggplot(data=DDA_data80,mapping=aes(x=strain,y=avgRAD80,col=time))+
+  geom_sina(alpha=0.45,size=2)+
+  xlab("Strain")+
+  ylab("RAD80")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  scale_y_reverse()+
+   scale_color_discrete(name="",labels=c("Ancestral","Evolved"))
+
+FoG80 <- ggplot(data=DDA_data80,mapping=aes(x=strain,y=avgFoG80,col=time))+
+  geom_sina(alpha=0.45,size=2)+
+  xlab("Strain")+
+  ylab("FoG80")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  scale_color_discrete(name="",labels=c("Ancestral","Evolved"))
+
+DDA80 <- grid.arrange(RAD80,FoG80)
+ggsave("DDA_80.pdf",DDA80)
+```
+
+```{r}
+#Creating difference data for DDA (Evolved - ancestral)
+
+#Adding new columns to store them in
+
+DDA_data20["RADDIF"] <- NA
+DDA_data20["FoGDIF"] <- NA
+
+#Creating new data frame, which includes the median result for each strain/treatment/person combination
+
+medDDA_data20 <- DDA_data20 %>% 
+  group_by(strain,time,Person) %>% 
+  mutate(medRAD = median(avgRAD20,remove.NA=T)) %>% 
+  mutate(medFoG = median(avgFoG20,remove.NA=T))
+
+#Removing the medians for the evolved rows, as median isn't being used here for evolved strains
+
+for(i in 1:nrow(medDDA_data20)){
+  if(medDDA_data20$time[i]=="5"){
+    medDDA_data20$medRAD[i] <- NA
+    medDDA_data20$medFoG[i] <- NA
+  }
+}
+
+#This is the for loop that generates the differences. This for loop goes through each row of the data frame It's a bit messy so I'll explain it in numbered steps
+#1. If the row is ancestral (indicated by time == 0), we are going to store the evol - anc results in that row. You could've done it next to evolved but this is just how I ended up doing it.The 'else' at the very bottom indicates that it should remain NA.
+#2. The data frame is subsetted to include only two rows, one with the ancestral values for that strain/replicate/person combination, and the other with the evolved values for that combination. This is named 'loopframe.'
+#3. If loopframe has two rows as it should, the difference can be calculated. If not, there must be missing values for that combination, and the difference cannot be calculated :/, and is listed as NA
+#4. The difference is calculated using the value to that replicate for evolved, minus the median value of all ancestral replicates for that strain
+
+for(i in 1:nrow(medDDA_data20)){
+  
+  if(medDDA_data20$time[i]=="0"){
+    
+  loopframe <- medDDA_data20 %>% 
+  filter(strain ==medDDA_data20$strain[i] & replicate == medDDA_data20$replicate[i] & Person == medDDA_data20$Person[i])
+    
+   if(nrow(loopframe)==2){
+     medDDA_data20$RADDIF[i] <- loopframe$avgRAD20[which(grepl(5,loopframe$time))]-loopframe$medRAD[which(grepl(0,loopframe$time))]
+     medDDA_data20$FoGDIF[i] <- loopframe$avgFoG20[which(grepl(5,loopframe$time))]-loopframe$medFoG[which(grepl(0,loopframe$time))]
+   }
+  else{medDDA_data20$RADDIF[i] <- NA
+  medDDA_data20$FoGDIF[i] <- NA}
+ 
+      }
+  
+  else{medDDA_data20$RADDIF[i] <- NA}
+}
+
+```
+
+```{r}
+#Creating scatterplot for FoG vs RAD, the second one worked better. We need to break it up by strains because taking all strains as a whole would not meet statistical requirements as each point would not be independent
+
+DDAscatter <- ggplot(data = medDDA_data20,mapping = aes(x=RADDIF,y=FoGDIF,col=strain))+
+  geom_point(alpha=0.5,size=2)+
+   theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+   xlab("Evolved - ancestral RAD20")+
+  ylab("Evolved - ancestral FoG20")+
+  stat_cor(data = medDDA_data20,mapping = aes(x=RADDIF,y=FoGDIF),inherit.aes = FALSE)+
+  xlim(-7,9)
+
+DDAscatter
+
+ggsave("DDAscatter.pdf",DDAscatter)
+
+DDAscatter2 <- ggplot(data = medDDA_data20,mapping = aes(x=RADDIF,y=FoGDIF,col=strain))+
+  geom_smooth(method = 'lm',se=F,linetype = "longdash")+
+  stat_cor()+
+  geom_point(alpha=0.35)+
+   theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+   xlab("Evolved - ancestral RAD20")+
+  ylab("Evolved - ancestral FoG20")+
+  xlim(-7,9)+
+  scale_color_brewer(palette ="Dark2")
+
+
+DDAscatter2
+
+
+ggsave("DDAscatter2.pdf",DDAscatter2)
+```
+
+```{r}
+#Combining with YPD data to eventually generate scatterplot matrix
+DDA_data20v2 <- medDDA_data20
+
+colnames(DDA_data20v2) <- paste(c("Strain","Replicate","Treatment","Person","avgRAD20","avgFoG20","RADDIF","FoGDIF","medRAD","medFoG"))
+colnames(YPDmodified5) <- paste(c("Person","Strain","Treatment","Replicate","avgOD","DIF","medOD"))
+YPDmodified5[,"Treatment"]<-lapply(YPDmodified5[,"Treatment"],as.factor)
+
+Combined <- DDA_data20v2 %>% 
+  left_join(YPDmodified5, by = c("Strain","Treatment","Replicate","Person"))
+```
+`
+
+```{r}
+#Scatterplot matrix
+ScatMatrix <- ggpairs(Combined,columns = c(7,8,12),
+                      aes(color=Strain),
+                      columnLabels = c("RAD20","FoG20","YPD OD"),
+                      xlab = "Evolved - ancestral",
+                       ylab = "Evolved - ancestral",
+                      lower = list(continuous = wrap("points",alpha=0.4)),
+                      diag = list(continuous = wrap("densityDiag",alpha=0.5)),
+                      upper = list(continuous = wrap("cor",size=2.5,face = "bold")))+
+theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+
+
+ScatMatrix
+
+ggsave("ScatMatrix.pdf",ScatMatrix)
+```
+
+

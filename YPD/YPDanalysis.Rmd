@@ -1,0 +1,118 @@
+---
+title: "YPD"
+author: "Riley Sierhuis"
+date: "26/07/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#Loading YPD data
+getwd()
+CleanedYPDdata <- read.csv("CleanedYPDdata.csv")
+```
+
+```{r}
+
+YPDmodified <- CleanedYPDdata
+
+#Removing outliers (I couldn't think of another way to do this besides manually)
+
+YPDmodified2 <- YPDmodified[-c(186,190,99,103,147,151,179,183,100,104,156,160,291,295,292,296,348,352),]
+
+#subsetting and averaging values
+
+YPDmodified3 <- YPDmodified2 %>% 
+  group_by(Strain,Treatment,Replicate) %>% 
+  summarise(avgOD = mean(OD)) 
+
+  
+```
+
+```{r}
+#Sina plot
+YPDsina <- ggplot(data = YPDmodified3, mapping = aes(x=Strain,y=avgOD,col = as.factor(Treatment)))+
+   geom_sina(alpha=0.6,size=2)+
+  xlab("Strain")+
+  ylab("OD")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  scale_color_manual(values = c("grey","purple"),name="",labels=c("Ancestral","Evolved"))+
+  ylim(0,1.5)
+  
+YPDsina
+
+ggsave("YPDsina.pdf",YPDsina)
+```
+
+```{r}
+#Finding the outliers based on my sina plot
+YPDoutliers <- YPDmodified3 %>% 
+  filter(avgOD < 1)
+
+YPDouttable <- tableGrob(YPDoutliers,rows = NULL, theme = ttheme_minimal())
+
+ggsave("YPDouttable.pdf",YPDouttable)
+```
+
+```{r}
+#Finding outliers named dby Rebekah (Need to load some objects from the DDA RMD file)
+DDAoutliers <- DDA_data20 %>% 
+  filter(strain=="y003"|strain=="y054"|strain=="y119"|strain=="y126") %>% 
+  filter(strain=="y003"&time=="0"&replicate==8 | 
+           strain=="y003"&time=="5"&replicate==1 |
+           strain=="y003"&time=="5"&replicate==7 |
+           strain=="y003"&time=="5"&replicate==11 |
+           strain=="y054"&time=="5"&replicate==9 |
+           strain=="y054"&time=="5"&replicate==12 |
+           strain=="y119"&time=="5"&replicate==6 |
+           strain=="y126"&time=="5"&replicate==1 |
+           strain=="y126"&time=="5"&replicate==8)
+
+DDAouttable <- tableGrob(DDAoutliers, rows = NULL, theme = ttheme_minimal())
+
+ggsave("DDAouttable.pdf",DDAouttable)
+```
+
+```{r}
+#Finding the difference evol - anc. See the DDA RMD file for details on how this works
+
+YPDmodified4 <- YPDmodified %>% 
+   group_by(Person,Strain,Treatment,Replicate) %>% 
+  summarise(avgOD = mean(OD)) 
+
+YPDmodified4["DIF"] <- NA
+
+YPDmodified5 <- YPDmodified4 %>% 
+   group_by(Strain,Treatment) %>% 
+  mutate(medOD = median(avgOD,remove.NA=T))
+
+for(i in 1:nrow(YPDmodified5)){
+  if(YPDmodified5$Treatment[i]==5){
+    YPDmodified5$medOD[i]<- NA
+  }
+}
+
+loopframe <- YPDmodified5 %>% 
+      filter(Strain ==YPDmodified5$Strain[1] & Replicate == YPDmodified5$Replicate[1])
+
+  
+for(i in 1:nrow(YPDmodified5)){
+  if(YPDmodified5$Treatment[i]==0){
+    
+    loopframe <- YPDmodified5 %>% 
+      filter(Strain ==YPDmodified5$Strain[i] & Replicate == YPDmodified5$Replicate[i])
+    
+    YPDmodified5$DIF[i] <- loopframe$avgOD[which(grepl(5,loopframe$Treatment))]-loopframe$medOD[which(grepl(0,loopframe$Treatment))]
+    
+  }
+  else{YPDmodified4$DIF[i] <- NA}
+}
+
+```
+
+

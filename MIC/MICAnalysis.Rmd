@@ -1,0 +1,204 @@
+---
+title: "MIC data workspace"
+author: "Riley Sierhuis"
+date: "16/06/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#Analysis of strains evolved to 0.5 POS vs ancestral strains
+##Subsetting the data, averaging between same replicates for evolved and all replicates for ancestral
+
+library(dplyr)
+library(ggplot2)
+scratchpoint5POS_data <- read.csv("MandQ_MIC.csv") %>% 
+  select(1:10) %>% 
+  filter(Drug==0.5) %>% 
+  filter(TechRep=="A" | TechRep=="B") %>% 
+  filter(is.na(LevelEvolvedTo) | LevelEvolvedTo==0.5) 
+
+colnames(scratchpoint5POS_data) <- c("Strain","Replicate","TechRep","Drug","LevelEvolvedTo","Time","OD_24h","OD_48h","OD_72h","Person")
+
+point5POS_evolved <- scratchpoint5POS_data %>%
+    filter(LevelEvolvedTo==0.5) %>% 
+  group_by(Person,Strain,Replicate) %>% 
+  summarise(avg24 = mean(OD_24h),avg48=mean(OD_48h),avg72=mean(OD_72h))
+
+
+point5POS_ancestral <- scratchpoint5POS_data %>% 
+  group_by(Strain) %>% 
+  filter(is.na(LevelEvolvedTo)) %>% 
+  summarise(med24 = median(OD_24h),med48=median(OD_48h),med72=median(OD_72h),min24=min(OD_24h),max24=max(OD_24h),min48=min(OD_48h),max48=max(OD_48h),min72=min(OD_72h),max72=max(OD_72h))
+
+```
+
+```{r}
+##Installing necessary Sina Plot packages
+
+library(ggforce)
+
+library(gridExtra)
+```
+
+
+```{r,fig.width=9,fig.height=11}
+
+##Creation of Sina plots, one for each time 
+
+h24 <- ggplot(data=point5POS_evolved,mapping=aes(x=Strain,y=avg24,col=Person))+
+  geom_sina()+
+  geom_point(data=point5POS_ancestral,mapping=aes(x=Strain,y=med24),col="navy",size=17,pch="-")+
+  geom_point(data=point5POS_ancestral,mapping=aes(x=Strain,y=min24),col="navy",size=8,pch="-")+
+  geom_point(data=point5POS_ancestral,mapping=aes(x=Strain,y=max24),col="navy",size=8,pch="-")+
+  xlab("Strain")+
+  ylab("Optical density at 24h")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  ylim(-0.5,1.5)
+
+h48 <- ggplot(data=point5POS_evolved,mapping=aes(x=Strain,y=avg48,col=Person))+
+  geom_sina()+
+  geom_point(data=point5POS_ancestral,mapping=aes(x=Strain,y=med48),col="navy",size=17,pch="-")+
+  geom_point(data=point5POS_ancestral,mapping=aes(x=Strain,y=min48),col="navy",size=8,pch="-")+
+  geom_point(data=point5POS_ancestral,mapping=aes(x=Strain,y=max48),col="navy",size=8,pch="-")+
+  xlab("Strain")+
+  ylab("Optical density at 48h")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  ylim(-0.5,1.5)
+
+h72 <- ggplot(data=point5POS_evolved,mapping=aes(x=Strain,y=avg72,col=Person))+
+  geom_sina()+
+  geom_point(data=point5POS_ancestral,mapping=aes(x=Strain,y=med72),col="navy",size=17,pch="-")+
+  geom_point(data=point5POS_ancestral,mapping=aes(x=Strain,y=min72),col="navy",size=8,pch="-")+
+  geom_point(data=point5POS_ancestral,mapping=aes(x=Strain,y=max72),col="navy",size=8,pch="-")+
+  xlab("Strain")+
+  ylab("Optical density at 72h")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  ylim(-0.5,1.5)
+
+combinedp5 <- grid.arrange(h24,h48,h72)
+
+ggsave("0.5POSFitness.pdf",combinedp5)
+  
+  
+  ###Check whether either/both subtracted off the background
+```
+
+```{r}
+#Analysis of strains evolved to POS 0.12 vs ancestral
+##Subsetting the data
+scratchpoint12POS_data <- read.csv("MandQ_MIC.csv") %>% 
+  select(1:10) %>% 
+  filter(Drug==0.12) %>% 
+  filter(TechRep=="A" | TechRep=="B") %>% 
+  filter(is.na(LevelEvolvedTo) | LevelEvolvedTo==0.12) 
+
+colnames(scratchpoint12POS_data) <- c("Strain","Replicate","TechRep","Drug","LevelEvolvedTo","Time","OD_24h","OD_48h","OD_72h","Person")
+
+point12POS_evolved <- scratchpoint12POS_data %>%
+    filter(LevelEvolvedTo==0.12) %>% 
+  group_by(Person,Strain,Replicate) %>% 
+  summarise(avg24 = mean(OD_24h),avg48=mean(OD_48h),avg72=mean(OD_72h))
+
+
+point12POS_ancestral <- scratchpoint12POS_data %>% 
+  group_by(Strain) %>% 
+  filter(is.na(LevelEvolvedTo)) %>% 
+  summarise(med24 = median(OD_24h),med48=median(OD_48h),med72=median(OD_72h),min24=min(OD_24h),max24=max(OD_24h),min48=min(OD_48h),max48=max(OD_48h),min72=min(OD_72h),max72=max(OD_72h))
+```
+
+```{r,fig.width=9,fig.height=11}
+##Creating sina plots, one for each time
+h24p12 <- ggplot(data=point12POS_evolved,mapping=aes(x=Strain,y=avg24))+
+  geom_sina(size=2.2,alpha=0.5,shape=16)+
+  geom_point(data=point12POS_ancestral,mapping=aes(x=Strain,y=med24),col="red",size=13,pch="-")+
+  geom_point(data=point12POS_ancestral,mapping=aes(x=Strain,y=min24),col="red",size=6,pch="-")+
+  geom_point(data=point12POS_ancestral,mapping=aes(x=Strain,y=max24),col="red",size=6,pch="-")+
+  xlab("Strain")+
+  ylab("Optical density at 24h")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  ylim(0,1.5)
+
+h48p12 <- ggplot(data=point12POS_evolved,mapping=aes(x=Strain,y=avg48))+
+  geom_sina(size=2.2,alpha=0.5,shape=16)+
+  geom_point(data=point12POS_ancestral,mapping=aes(x=Strain,y=med48),col="red",size=13,pch="-")+
+  geom_point(data=point12POS_ancestral,mapping=aes(x=Strain,y=min48),col="red",size=6,pch="-")+
+  geom_point(data=point12POS_ancestral,mapping=aes(x=Strain,y=max48),col="red",size=6,pch="-")+
+  xlab("Strain")+
+  ylab("Optical density at 48h")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  ylim(0,1.5)
+
+h72p12 <- ggplot(data=point12POS_evolved,mapping=aes(x=Strain,y=avg72))+
+  geom_sina(size=2.2,alpha=0.5,shape=16)+
+  geom_point(data=point12POS_ancestral,mapping=aes(x=Strain,y=med72),col="red",size=13,pch="-")+
+  geom_point(data=point12POS_ancestral,mapping=aes(x=Strain,y=min72),col="red",size=6,pch="-")+
+  geom_point(data=point12POS_ancestral,mapping=aes(x=Strain,y=max72),col="red",size=6,pch="-")+
+  xlab("Strain")+
+  ylab("Optical density at 72h")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  ylim(0,1.5)
+
+combinedp12 <- grid.arrange(h24p12,h48p12,h72p12)
+
+ggsave("0.12POSFitness.pdf",combinedp12)
+```
+
+```{r}
+#Looking at Mixed data for 0.5 POS
+##Subsetting the data
+
+scratchpoint5POS_Mixed_data <- read.csv("MandQ_MIC.csv") %>% 
+  select(1:10) %>% 
+  filter(Drug==0.5) %>% 
+  filter(TechRep=="A mixed" | TechRep=="B mixed") %>% 
+  filter(is.na(LevelEvolvedTo) | LevelEvolvedTo==0.5) 
+
+colnames(scratchpoint5POS_Mixed_data) <- c("Strain","Replicate","TechRep","Drug","LevelEvolvedTo","Time","OD_24h","OD_48h","OD_72h","Person")
+
+point5POS_Mixed_evolved <- scratchpoint5POS_Mixed_data %>%
+    filter(LevelEvolvedTo==0.5) %>% 
+  group_by(Person,Strain,Replicate) %>% 
+  summarise(avg72=mean(OD_72h))
+
+
+point5POS_Mixed_ancestral <- scratchpoint5POS_Mixed_data %>% 
+  group_by(Strain) %>% 
+  filter(is.na(LevelEvolvedTo)) %>% 
+  summarise(mean72=mean(OD_72h))
+```
+
+```{r}
+
+ggplot(data=point5POS_Mixed_evolved,mapping=aes(x=Strain,y=avg72))+
+  geom_sina(size=2.2,alpha=0.5,shape=16)+
+  geom_point(data=point5POS_Mixed_ancestral,mapping=aes(x=Strain,y=mean72),col="red",size=13,pch="-")+
+  xlab("Strain")+
+  ylab("Optical density at 72h")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  ylim(0,1.5)+
+  ggtitle("OD readings of mixed samples at 0.5 POS")
+
+ggsave("0.5POSMixedFitness.pdf")
+```
+
+```{r}
+##Seeing if there is mixed data for 0.12 POS
+scratchpoint12POS_Mixed_data <- read.csv("MandQ_MIC.csv") %>% 
+  select(1:10) %>% 
+   filter(TechRep=="A mixed" | TechRep=="B mixed") %>% 
+  filter(Person=="Q")
+  
+```
+

@@ -1,0 +1,112 @@
+---
+title: "Extinction Rates Visualisation"
+author: "Riley"
+date: "5/25/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#Loading in the data (I used a modified excel sheet that was easier to work with)
+ex_rates2 <- read.csv("ModifiedExtinctionRates.csv")
+ex_rates2
+```
+
+```{r}
+#Subsetting for Madison's data, creating new percent alive column, converting time to a factor variable, and arranging by strain
+ex_rates2_percent_M <- ex_rates2 %>% 
+  filter(Name=="Madison")%>% 
+  mutate_each(funs(factor),Time) %>% 
+  mutate(percent_strains_alive=Strains.alive.with.0.5.POS*100/12) %>% 
+  arrange(Strain)
+
+ex_rates2_percent_M
+```
+```{r}
+#Creating barchart for Madison's data
+ggplot(data=ex_rates2_percent_M,mapping = aes(x=Strain,y=percent_strains_alive, fill=Time))+
+  geom_col(position="dodge")+
+  ggtitle(expression(paste("(M) ",italic("Candida albicans")," survival rates while exposed to 0.5 ",mu, "g/mL posaconazole")))+
+  xlab("Strain")+
+  ylab("Percent survived")+
+  scale_fill_brewer()+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+  
+  ggsave("MadisonExtinctionRates.pdf")
+```
+
+
+```{r}
+#Subsetting Quinn's data
+ex_rates2_percent_Q <- ex_rates2 %>% 
+  filter(Name=="Quinn")%>% 
+  mutate_each(funs(factor),Time) %>% 
+  mutate(percent_strains_alive=Strains.alive.with.0.5.POS*100/12) %>% 
+  arrange(Strain)
+
+ex_rates2_percent_Q
+
+```
+
+
+```{r}
+#Creating Quinn's barchart
+ggplot(data=ex_rates2_percent_Q,mapping = aes(x=Strain,y=percent_strains_alive, fill=Time))+
+  geom_col(position="dodge")+
+  scale_fill_brewer()+
+  ggtitle(expression(paste("(Q) ",italic("Candida albicans")," survival rates when exposed to 0.5 ",mu, "g/mL posaconazole")))+
+  xlab("Strain")+
+  ylab("Percent survived")+
+  theme_bw()+ 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())
+ggsave("QuinnExtinctionRates.pdf")
+```
+
+
+```{r fig.height=6,fig.width=8}
+#Madison barchart with similar Quinn data, split by person
+ex_rates2_percent_MQ <- ex_rates2 %>% 
+  filter(Name=="Madison" | Strain=="y003" | Strain=="y106" | Strain=="y109") %>% 
+   mutate_each(funs(factor),Time) %>% 
+  mutate(percent_strains_alive=Strains.alive.with.0.5.POS*100/12) %>% 
+  arrange(Strain)
+
+ex_rates2_percent_MQ
+
+ggplot(data=ex_rates2_percent_MQ,mapping = aes(x=Strain,y=percent_strains_alive, fill=Time))+
+  geom_col(position="dodge")+
+  scale_fill_brewer()+
+  ggtitle(expression(paste("(MQ) ",italic("Candida albicans")," survival rates when exposed to 0.5 ",mu, "g/mL posaconazole")))+
+  xlab("Strain")+
+  ylab("Percent survived")+
+  theme_bw()+ 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  facet_wrap(~Name,nrow = 2)
+
+ggsave("MQSplitExtinctionRates.pdf")
+```
+
+```{r}
+#Makin Madison barchart with strains that Quinn also looked at included
+MQCombineddata <- read.csv("ExtinctionRatesMQCombined")
+
+MQCombined <- MQCombineddata %>% 
+   mutate_each(funs(factor),Time) %>% 
+  arrange(Strain)
+  
+ggplot(data=MQCombined,mapping = aes(x=Strain,y=Percentalive, fill=Time))+
+  geom_col(position="dodge")+
+  ggtitle(expression(paste("(MQ) ",italic("Candida albicans")," survival rates when exposed to 0.5 ",mu, "g/mL posaconazole")))+
+  xlab("Strain")+
+  ylab("Percent survived")+
+  theme_bw()+ 
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+
+  scale_fill_brewer()
+
+ggsave("MQCombinedExtinctionRates.pdf")
+```

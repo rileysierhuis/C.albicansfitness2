@@ -48,7 +48,7 @@ library(gridExtra)
 
 ```{r,fig.width=9,fig.height=11}
 
-##Creation of Sina plots, one for each time 
+##Creation of Sina plots, one for each time. The ancestral minimum, median, and maximum are added as subsequent layers.
 
 h24 <- ggplot(data=point5POS_evolved,mapping=aes(x=Strain,y=avg24,col=Person))+
   geom_sina()+

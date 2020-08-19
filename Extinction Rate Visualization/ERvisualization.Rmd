@@ -92,7 +92,7 @@ ggsave("MQSplitExtinctionRates.pdf")
 ```
 
 ```{r}
-#Makin Madison barchart with strains that Quinn also looked at included
+#Makin Madison barchart with strains that Quinn also looked at included. I generated a new spreadsheet in excel to combine their results.
 MQCombineddata <- read.csv("ExtinctionRatesMQCombined")
 
 MQCombined <- MQCombineddata %>% 
